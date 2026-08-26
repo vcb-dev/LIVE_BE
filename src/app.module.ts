@@ -42,7 +42,7 @@ import { PrismaModule } from './prisma/prisma.module';
   controllers: [AppController],
   providers: [
     AppService,
-    // JWT → CSRF → Roles (legacy @Roles) → Permissions (@RequirePermissions)
+    // JWT → CSRF → Roles (@Roles on handlers that need role checks)
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
