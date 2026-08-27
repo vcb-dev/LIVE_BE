@@ -96,7 +96,7 @@ export class AuthService {
           role: authUser.role,
         },
         {
-          secret: this.config.get<string>('JWT_SECRET') ?? 'dev-secret-change-me',
+          secret: this.config.get<string>('JWT_SECRET'),
           expiresIn: accessExpires as `${number}m` | `${number}d` | `${number}h`,
         },
       ),
