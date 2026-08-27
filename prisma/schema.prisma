@@ -75,6 +75,16 @@ enum ItemStatus {
   @@map("item_status")
 }
 
+// Vai trò của một đoạn trong timeline. Không suy ra từ position được vì
+// người tạo phiên sửa tay thứ tự trước khi live.
+enum SegmentKind {
+  OPENING     // đúng 1 đoạn, đầu phiên
+  PRODUCT     // giới thiệu 1 sản phẩm, có ngân sách thời gian riêng
+  INTERLUDE   // đoạn xen giữa 2 sản phẩm: CTA + trò chơi
+  CLOSING     // đúng 1 đoạn, cuối phiên
+  @@map("segment_kind")
+}
+
 // ============ NHÃN & DANH MỤC ============
 
 // Vui, Buồn, Tập trung, Ngạc nhiên, Hoài nghi, Hối hận, Cau có...
@@ -230,11 +240,9 @@ model ScriptBlock {
   // Với PRODUCT_SPEC: khuôn chứa {{name}}, {{material}}, {{size}}...
   content String
 
-  // Chỉ tính tự động được cho STORY/MEANING (wordCount / speechRate).
-  // Các loại còn lại là thẻ nhắc việc nên PHẢI nhập tay:
-  // "Show video sản phẩm" có 4 từ nhưng chiếm 30 giây.
+  // Nhập tay cho mọi loại, không suy ra từ độ dài text: thẻ nhắc việc như
+  // "Show video sản phẩm" chỉ 4 từ nhưng chiếm 30 giây.
   durationSec Int @map("duration_sec")
-  wordCount   Int @default(0) @map("word_count")  // lưu sẵn để tính lại durationSec khi speechRate đổi, khỏi đếm lại 250k dòng
 
   // ----- Phạm vi áp dụng, xét theo thang ưu tiên khi random -----
   // productId   -> riêng 1 sản phẩm (ưu tiên cao nhất). STORY/MEANING bắt buộc có.
@@ -250,8 +258,8 @@ model ScriptBlock {
   lastUsedAt DateTime? @map("last_used_at")            // chống lặp: 1 phiên 4-5h đọc CTA ~50 lần
   isActive   Boolean   @default(true) @map("is_active") // tắt mềm, vì segment_items còn tham chiếu
 
-  // Cột generated do Postgres tính, khai báo trong SQL migration viết tay
-  // (Prisma không hỗ trợ tsvector). Query qua $queryRaw.
+  // Do trigger script_blocks_search_vector_tg tự điền từ title + content.
+  // Đừng ghi tay vào cột này. Query qua $queryRaw vì Prisma không hiểu tsvector.
   searchVector Unsupported("tsvector")? @map("search_vector")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -266,6 +274,7 @@ model ScriptBlock {
   @@index([productId, type, isActive])            // index chính: block của 1 SP theo loại
   @@index([categoryId, type, isActive])           // tầng dự phòng khi SP chưa có nội dung riêng
   @@index([type, groupId, isActive, lastUsedAt])  // block dùng chung, ưu tiên lâu chưa dùng
+  @@index([searchVector], type: Gin)              // tìm toàn văn trong ~250k dòng
   @@map("script_blocks")
 }
 
@@ -282,10 +291,6 @@ model LiveSession {
   endedAt     DateTime?     @map("ended_at")
   hostId      String?       @map("host_id") @db.Uuid
 
-  // Số từ nói mỗi giây. Để ở phiên chứ không phải hằng số toàn cục vì mỗi người
-  // dẫn một tốc độ; hiệu chỉnh lại từ số liệu thật sau mỗi phiên.
-  speechRate Decimal @default(2.5) @map("speech_rate") @db.Decimal(4, 2)
-
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -296,13 +301,16 @@ model LiveSession {
   @@map("live_sessions")
 }
 
-// Một đoạn trong timeline, thường 300s cho 1 sản phẩm. Phiên 4.5h ≈ 54 segment.
+// Một đoạn trong timeline. Chuỗi đoạn của một phiên:
+// OPENING -> [PRODUCT -> INTERLUDE] x N -> CLOSING.
+// Phiên 4.5h với 300s mỗi sản phẩm và ~120s mỗi đoạn xen ≈ 38 sản phẩm.
 model SessionSegment {
-  id         String    @id @default(uuid()) @db.Uuid
-  sessionId  String    @map("session_id") @db.Uuid
-  productId  String?   @map("product_id") @db.Uuid  // null = đoạn xen: game, chào khách, nghỉ
+  id         String      @id @default(uuid()) @db.Uuid
+  sessionId  String      @map("session_id") @db.Uuid
+  kind       SegmentKind
+  productId  String?     @map("product_id") @db.Uuid  // chỉ có giá trị khi kind = PRODUCT
   position   Int
-  plannedSec Int       @map("planned_sec")          // ngân sách, generator lấp block cho vừa
+  plannedSec Int         @map("planned_sec")          // ngân sách, generator lấp block cho vừa
   startedAt  DateTime? @map("started_at")
   endedAt    DateTime? @map("ended_at")
   createdAt  DateTime  @default(now()) @map("created_at")
