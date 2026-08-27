@@ -12,6 +12,7 @@ import { CsrfGuard } from './auth/guards/csrf.guard';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { BlockGroupsModule } from './block-groups/block-groups.module';
 import { EmotionsModule } from './emotions/emotions.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -40,6 +41,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     CloudinaryModule,
     EmotionsModule,
+    BlockGroupsModule,
   ],
   controllers: [AppController],
   providers: [
