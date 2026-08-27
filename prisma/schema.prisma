@@ -8,7 +8,8 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// Bảng User có 3 role chính
+// ============ AUTH (giữ nguyên, chỉ thêm quan hệ liveSessions) ============
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -17,11 +18,12 @@ model User {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+
   refreshTokens RefreshToken[]
+  liveSessions  LiveSession[]
   @@map("users")
 }
 
-// Bảng quản lý refresh token của user
 model RefreshToken {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
@@ -29,6 +31,7 @@ model RefreshToken {
   expiresAt DateTime  @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
   createdAt DateTime  @default(now()) @map("created_at")
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId])
   @@map("refresh_tokens")
@@ -41,4 +44,311 @@ enum UserRole {
   @@map("user_role")
 }
 
+// ============ ENUMS ============
 
+// 7 loại nội dung dùng chung bảng script_blocks vì cùng hình dạng:
+// text + thời lượng + biểu cảm. Thêm loại mới chỉ cần thêm giá trị ở đây.
+enum BlockType {
+  OPENING       // mở đầu: thẻ nhắc hành động (bước vào khung hình, vẫy tay chào)
+  PRODUCT_SPEC  // khuôn đọc thông số SP, content chứa placeholder, không phải text viết sẵn
+  STORY         // câu chuyện sản phẩm — văn nói thật
+  MEANING       // ý nghĩa sản phẩm — văn nói thật
+  CTA           // hành động: kêu gọi, chốt đơn, social proof... có chia mục con
+  GAME          // trò chơi: đoán giá, comment may mắn... có chia mục con
+  CLOSING       // kết thúc
+  @@map("block_type")
+}
+
+enum SessionStatus {
+  DRAFT      // đã tạo, chưa lên sóng
+  RUNNING
+  PAUSED
+  FINISHED
+  @@map("session_status")
+}
+
+enum ItemStatus {
+  PENDING
+  ACTIVE     // đang chạy, đồng hồ đếm
+  DONE
+  SKIPPED    // bỏ qua khi phiên bị trễ giờ
+  @@map("item_status")
+}
+
+// ============ NHÃN & DANH MỤC ============
+
+// Vui, Buồn, Tập trung, Ngạc nhiên, Hoài nghi, Hối hận, Cau có...
+// CHỜ CHỐT: cần danh sách chuẩn trước khi seed. Trong bảng CTA đang có thêm
+// Hồi hộp / Shock / Gấp gáp / Nghi vấn, chưa rõ có trùng nghĩa với nhãn nào không.
+// code là thứ code dựa vào, đặt rồi không đổi; name sửa thoải mái.
+model Emotion {
+  id   String @id @default(uuid()) @db.Uuid
+  code String @unique
+  name String
+
+  // Ảnh mẫu biểu cảm do người dùng upload lúc tạo. Hiện lên màn hình khi live
+  // để người dẫn liếc là biết phải làm mặt gì. Lưu URL trả về từ Cloudinary.
+  imageUrl String? @map("image_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  blocks BlockEmotion[]
+  @@map("emotions")
+}
+
+// Một block có thể mang nhiều nhãn — dữ liệu thật đã thấy "(Vui/Buồn)".
+model BlockEmotion {
+  blockId   String @map("block_id")   @db.Uuid
+  emotionId String @map("emotion_id") @db.Uuid
+
+  block   ScriptBlock @relation(fields: [blockId],   references: [id], onDelete: Cascade)
+  emotion Emotion     @relation(fields: [emotionId], references: [id], onDelete: Cascade)
+
+  @@id([blockId, emotionId])
+  @@index([emotionId])
+  @@map("block_emotions")
+}
+
+// Mục con bên trong một loại: CTA có "Tương tác", "Kéo xem sản phẩm", "Chốt đơn",
+// "Tạo cảm giác khẩn trương", "Social proof"; GAME có "Đoán giá", "Comment may mắn".
+// Loại không chia mục con (STORY, MEANING, OPENING...) thì block để groupId = null.
+model BlockGroup {
+  id   String    @id @default(uuid()) @db.Uuid
+  type BlockType
+  code String                                    // TUONG_TAC, KEO_XEM_SP, CHOT_DON...
+  name String
+
+  weight    Int @default(1)                      // tần suất nhóm được chọn khi random
+  sortOrder Int @default(0) @map("sort_order")
+
+  // CHỜ CHỐT: các mục con đang đánh số 1,2,3 — chưa rõ là danh sách để chọn hay
+  // thứ tự bắt buộc. Cột này diễn đạt được cả ba khả năng, khỏi migrate lại:
+  //   1 = random 1 mục con (mặc định)
+  //   n = random n mục con, giữ thứ tự sortOrder
+  //   0 = đọc hết cả nhóm theo sortOrder
+  pickCount Int @default(1) @map("pick_count")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  blocks ScriptBlock[]
+  @@unique([type, code])    // code chỉ cần duy nhất trong phạm vi một loại
+  @@map("block_groups")
+}
+
+// Cây ngành hàng. Gắn block cho cả nhóm sản phẩm thay vì từng mã,
+// và để nhẫn / dây chuyền có khuôn PRODUCT_SPEC khác nhau.
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  parentId  String?  @map("parent_id") @db.Uuid   // null = danh mục gốc
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  parent   Category?     @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[]    @relation("CategoryTree")
+  products Product[]
+  blocks   ScriptBlock[]
+  @@map("categories")
+}
+
+// ============ SẢN PHẨM ============
+
+// ~12.500 mã. Câu chuyện và ý nghĩa gắn ở cấp này, KHÔNG gắn ở biến thể,
+// để khỏi nhân bản nội dung cho từng size/màu.
+model Product {
+  id         String  @id @default(uuid()) @db.Uuid
+  code       String  @unique                      // mã bên kho hàng, dùng đối chiếu khi import
+  name       String
+  categoryId String? @map("category_id") @db.Uuid
+
+  // Nguồn dữ liệu để render {{placeholder}} trong block PRODUCT_SPEC.
+  // Json vì bộ thuộc tính khác nhau theo mặt hàng: nhẫn có size và số chỉ,
+  // dây chuyền có độ dài. Khoá dự kiến: material, color, size, chi, weight, stone, clasp.
+  // CHỜ CHỐT: nếu mọi mã đều đủ đúng 8 trường thì tách thành 8 cột sẽ chặt hơn.
+  attributes Json?
+
+  description String?
+
+  // Mảng thay vì bảng ProductImage riêng: không cần metadata gì cho từng ảnh
+  // ngoài thứ tự, mà thứ tự đã nằm sẵn trong mảng. Phần tử đầu là ảnh chính.
+  // ponytail: chịu được vài chục ảnh mỗi SP; cần chú thích riêng từng ảnh thì mới tách bảng.
+  images String[] @default([])
+
+  // Phục vụ thẻ nhắc CTA "Show video sản phẩm".
+  videoUrl String? @map("video_url")
+
+  // Đối chiếu với Sapo. Hiện chỉ lưu để tra ngược, chưa có đồng bộ tự động —
+  // package.json có script sapo:oauth:* nhưng file đã không còn (tàn dư repo mẫu).
+  sapoId  String? @unique @map("sapo_id")
+  sapoUrl String? @map("sapo_url")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  category Category?        @relation(fields: [categoryId], references: [id])
+  variants ProductVariant[]
+  blocks   ScriptBlock[]
+  segments SessionSegment[]
+
+  @@index([categoryId, isActive])
+  @@map("products")
+}
+
+// Biến thể (size, màu, dung tích). Giá và tồn kho ở đây, không ở Product.
+model ProductVariant {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  sku       String   @unique
+  name      String?                               // "Size L"; null nếu SP chỉ có 1 biến thể
+  price     Decimal? @db.Decimal(12, 2)           // Decimal chứ không Float — tiền không chịu sai số nhị phân
+  stock     Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@index([productId])
+  @@map("product_variants")
+}
+
+// ============ KHO NỘI DUNG ============
+
+// Quy mô dự kiến ~250.000 dòng (12.500 SP x ~10 câu chuyện + ~10 ý nghĩa).
+// Vẫn là bảng nhỏ với Postgres: index B-tree ở mức này sâu 3 tầng, y hệt khi tách bảng.
+model ScriptBlock {
+  id      String    @id @default(uuid()) @db.Uuid
+  type    BlockType
+  groupId String?   @map("group_id") @db.Uuid    // mục con, null với loại không chia nhóm
+  title   String?                                // nhãn ngắn cho admin dễ tìm, không đọc lên sóng
+
+  // Với STORY/MEANING: văn nói thật, đọc nguyên văn.
+  // Với OPENING/CTA/GAME/CLOSING: thẻ nhắc việc hiện lên màn hình ("Giơ ảnh sản phẩm").
+  // Với PRODUCT_SPEC: khuôn chứa {{name}}, {{material}}, {{size}}...
+  content String
+
+  // Chỉ tính tự động được cho STORY/MEANING (wordCount / speechRate).
+  // Các loại còn lại là thẻ nhắc việc nên PHẢI nhập tay:
+  // "Show video sản phẩm" có 4 từ nhưng chiếm 30 giây.
+  durationSec Int @map("duration_sec")
+  wordCount   Int @default(0) @map("word_count")  // lưu sẵn để tính lại durationSec khi speechRate đổi, khỏi đếm lại 250k dòng
+
+  // ----- Phạm vi áp dụng, xét theo thang ưu tiên khi random -----
+  // productId   -> riêng 1 sản phẩm (ưu tiên cao nhất). STORY/MEANING bắt buộc có.
+  // categoryId  -> dùng chung cả ngành hàng. Cũng là khuôn PRODUCT_SPEC theo loại hàng.
+  // cả hai null -> dùng chung mọi sản phẩm (OPENING/CLOSING/CTA/GAME).
+  // Ràng buộc theo type phải check ở service — Prisma không diễn đạt được FK bắt buộc có điều kiện.
+  productId  String? @map("product_id")  @db.Uuid
+  categoryId String? @map("category_id") @db.Uuid
+
+  weight     Int       @default(1)                     // trọng số random trong cùng nhóm ứng viên
+  sortOrder  Int       @default(0) @map("sort_order")  // thứ tự mục con trong nhóm
+  usageCount Int       @default(0) @map("usage_count")
+  lastUsedAt DateTime? @map("last_used_at")            // chống lặp: 1 phiên 4-5h đọc CTA ~50 lần
+  isActive   Boolean   @default(true) @map("is_active") // tắt mềm, vì segment_items còn tham chiếu
+
+  // Cột generated do Postgres tính, khai báo trong SQL migration viết tay
+  // (Prisma không hỗ trợ tsvector). Query qua $queryRaw.
+  searchVector Unsupported("tsvector")? @map("search_vector")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  group    BlockGroup? @relation(fields: [groupId],    references: [id], onDelete: SetNull)
+  product  Product?    @relation(fields: [productId],  references: [id], onDelete: Cascade)
+  category Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  emotions BlockEmotion[]
+  items    SegmentItem[]
+
+  @@index([productId, type, isActive])            // index chính: block của 1 SP theo loại
+  @@index([categoryId, type, isActive])           // tầng dự phòng khi SP chưa có nội dung riêng
+  @@index([type, groupId, isActive, lastUsedAt])  // block dùng chung, ưu tiên lâu chưa dùng
+  @@map("script_blocks")
+}
+
+// ============ PHIÊN LIVE ============
+
+// Một buổi live 4-5 tiếng. Timeline = chuỗi segment nối tiếp.
+model LiveSession {
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String                                    // "Live tối 26/08"
+  scheduledAt DateTime?     @map("scheduled_at")
+  plannedSec  Int           @map("planned_sec")         // 16200 = 4.5 tiếng
+  status      SessionStatus @default(DRAFT)
+  startedAt   DateTime?     @map("started_at")
+  endedAt     DateTime?     @map("ended_at")
+  hostId      String?       @map("host_id") @db.Uuid
+
+  // Số từ nói mỗi giây. Để ở phiên chứ không phải hằng số toàn cục vì mỗi người
+  // dẫn một tốc độ; hiệu chỉnh lại từ số liệu thật sau mỗi phiên.
+  speechRate Decimal @default(2.5) @map("speech_rate") @db.Decimal(4, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  host     User?            @relation(fields: [hostId], references: [id])
+  segments SessionSegment[]
+
+  @@index([status, scheduledAt])
+  @@map("live_sessions")
+}
+
+// Một đoạn trong timeline, thường 300s cho 1 sản phẩm. Phiên 4.5h ≈ 54 segment.
+model SessionSegment {
+  id         String    @id @default(uuid()) @db.Uuid
+  sessionId  String    @map("session_id") @db.Uuid
+  productId  String?   @map("product_id") @db.Uuid  // null = đoạn xen: game, chào khách, nghỉ
+  position   Int
+  plannedSec Int       @map("planned_sec")          // ngân sách, generator lấp block cho vừa
+  startedAt  DateTime? @map("started_at")
+  endedAt    DateTime? @map("ended_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  session LiveSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product Product?      @relation(fields: [productId], references: [id])
+  items   SegmentItem[]
+
+  @@unique([sessionId, position])   // chặn 2 segment cùng vị trí trong 1 phiên
+  @@map("session_segments")
+}
+
+// Một dòng trong timeline: đúng 1 block, kèm mốc thời gian thật.
+model SegmentItem {
+  id        String    @id @default(uuid()) @db.Uuid
+  segmentId String    @map("segment_id") @db.Uuid
+  blockId   String    @map("block_id")   @db.Uuid
+  position  Int
+  type      BlockType                               // chép từ block để render timeline khỏi join
+
+  // Snapshot đã render {{placeholder}}. Sửa block gốc về sau KHÔNG làm đổi kịch bản
+  // phiên đã chạy — đây là chỗ duy nhất chấp nhận trùng dữ liệu.
+  content String
+
+  // Snapshot nhãn biểu cảm, cùng lý do với content. Màn hình live cần biết ngay
+  // item này mang biểu cảm gì để hiện ảnh mẫu, khỏi join qua block_emotions -> emotions.
+  emotionCodes String[] @default([]) @map("emotion_codes")
+
+  plannedSec Int        @map("planned_sec")
+  status     ItemStatus @default(PENDING)
+
+  // Backend chỉ ghi mốc, không đếm ngược. FE tự chạy đồng hồ từ startedAt + plannedSec,
+  // nhờ vậy reload trang hay mở nhiều màn hình vẫn ra đúng giờ.
+  // Chênh lệch (endedAt - startedAt) so với plannedSec dùng để hiệu chỉnh speechRate.
+  startedAt DateTime? @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  segment SessionSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  // Không Cascade: block đã lên sóng thì không cho xoá mất dấu, dùng isActive để tắt.
+  block   ScriptBlock    @relation(fields: [blockId], references: [id])
+
+  @@unique([segmentId, position])
+  @@index([segmentId, status])      // truy vấn nóng khi live: tìm item đang ACTIVE
+  @@map("segment_items")
+}
