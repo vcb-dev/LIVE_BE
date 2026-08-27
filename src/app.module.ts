@@ -14,6 +14,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { BlockGroupsModule } from './block-groups/block-groups.module';
 import { EmotionsModule } from './emotions/emotions.module';
+import { ProductsModule } from './products/products.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -42,6 +43,7 @@ import { PrismaModule } from './prisma/prisma.module';
     CloudinaryModule,
     EmotionsModule,
     BlockGroupsModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [
