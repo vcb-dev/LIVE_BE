@@ -16,6 +16,7 @@ import { BlockGroupsModule } from './block-groups/block-groups.module';
 import { EmotionsModule } from './emotions/emotions.module';
 import { ProductsModule } from './products/products.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ScriptBlocksModule } from './script-blocks/script-blocks.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { PrismaModule } from './prisma/prisma.module';
     EmotionsModule,
     BlockGroupsModule,
     ProductsModule,
+    ScriptBlocksModule,
   ],
   controllers: [AppController],
   providers: [

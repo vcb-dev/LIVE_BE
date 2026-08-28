@@ -1,9 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BlockType, Prisma } from '@prisma/client';
 import type { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { buildPaginatedMeta } from '../common/pagination/paginate';
 import { PrismaService } from '../prisma/prisma.service';
@@ -53,6 +54,10 @@ export class BlockGroupsService {
   }
 
   async create(dto: CreateBlockGroupDto): Promise<BlockGroupResponse> {
+    if (dto.type !== BlockType.CTA) {
+      throw new BadRequestException('Chỉ CTA mới có nhóm block');
+    }
+
     try {
       const group = await this.prisma.blockGroup.create({
         data: {
