@@ -310,6 +310,8 @@ model SessionSegment {
   sessionId  String      @map("session_id") @db.Uuid
   kind       SegmentKind
   productId  String?     @map("product_id") @db.Uuid  // chỉ có giá trị khi kind = PRODUCT
+  // Snapshot ảnh sản phẩm hiển thị trên màn live (products.images[0] lúc generate).
+  productImageUrl String? @map("product_image_url")
   position   Int
   plannedSec Int         @map("planned_sec")          // ngân sách, generator lấp block cho vừa
   startedAt  DateTime? @map("started_at")
@@ -333,6 +335,9 @@ model SegmentItem {
   position  Int
   type      BlockType                               // chép từ block để render timeline khỏi join
 
+  // Snapshot nhãn ngắn hiển thị trên màn live (từ script_blocks.title).
+  title String?
+
   // Snapshot đã render {{placeholder}}. Sửa block gốc về sau KHÔNG làm đổi kịch bản
   // phiên đã chạy — đây là chỗ duy nhất chấp nhận trùng dữ liệu.
   content String
@@ -340,6 +345,8 @@ model SegmentItem {
   // Snapshot nhãn biểu cảm, cùng lý do với content. Màn hình live cần biết ngay
   // item này mang biểu cảm gì để hiện ảnh mẫu, khỏi join qua block_emotions -> emotions.
   emotionCodes String[] @default([]) @map("emotion_codes")
+  // Snapshot URL ảnh biểu cảm, song song emotionCodes — màn live render trực tiếp.
+  emotionImageUrls String[] @default([]) @map("emotion_image_urls")
 
   plannedSec Int        @map("planned_sec")
   status     ItemStatus @default(PENDING)

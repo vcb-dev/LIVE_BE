@@ -15,11 +15,12 @@ function block(partial: {
     type: partial.type,
     groupId: partial.groupId ?? null,
     productId: partial.productId ?? null,
+    title: `title-${partial.id}`,
     content: `content-${partial.id}`,
     durationSec: partial.durationSec ?? 30,
     weight: 1,
     lastUsedAt: null as Date | null,
-    emotions: [{ emotion: { code: 'HAPPY' } }],
+    emotions: [{ emotion: { code: 'HAPPY', imageUrl: 'https://cdn.example/emotions/happy.png' } }],
     createdAt: now,
   };
 }
@@ -28,7 +29,7 @@ describe('planTimeline', () => {
   const productId = '11111111-1111-4111-8111-111111111111';
 
   const deps = {
-    products: [{ id: productId, code: 'SP001', name: 'Nhẫn', attributes: null }],
+    products: [{ id: productId, code: 'SP001', name: 'Nhẫn', attributes: null, images: ['https://cdn.example/products/sp001.jpg'] }],
     openingBlocks: [block({ id: 'open', type: BlockType.OPENING })],
     closingBlocks: [block({ id: 'close', type: BlockType.CLOSING })],
     ctaBlocks: [block({ id: 'cta', type: BlockType.CTA, groupId: 'g1' })],
@@ -77,6 +78,11 @@ describe('planTimeline', () => {
       SegmentKind.CLOSING,
     ]);
     expect(actual.segments[2]?.items[0]?.blockId).toBe('game');
+    expect(actual.segments[2]?.items[0]?.title).toBe('title-game');
+    expect(actual.segments[2]?.items[0]?.emotionImageUrls).toEqual([
+      'https://cdn.example/emotions/happy.png',
+    ]);
     expect(actual.segments[2]?.items[0]?.content).toBe('content-game');
+    expect(actual.segments[3]?.productImageUrl).toBe('https://cdn.example/products/sp001.jpg');
   });
 });

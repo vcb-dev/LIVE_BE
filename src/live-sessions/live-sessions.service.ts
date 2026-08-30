@@ -27,11 +27,12 @@ const blockSelect = {
   type: true,
   groupId: true,
   productId: true,
+  title: true,
   content: true,
   durationSec: true,
   weight: true,
   lastUsedAt: true,
-  emotions: { include: { emotion: { select: { code: true } } } },
+  emotions: { include: { emotion: { select: { code: true, imageUrl: true } } } },
 } satisfies Prisma.ScriptBlockSelect;
 
 /**
@@ -243,7 +244,7 @@ export class LiveSessionsService {
           ? Promise.resolve([])
           : this.prisma.product.findMany({
               where: { id: { in: productIds }, isActive: true },
-              select: { id: true, code: true, name: true, attributes: true },
+              select: { id: true, code: true, name: true, attributes: true, images: true },
             }),
         this.prisma.scriptBlock.findMany({
           where: { type: BlockType.OPENING, isActive: true },
@@ -310,6 +311,7 @@ export class LiveSessionsService {
           sessionId,
           kind: segment.kind,
           productId: segment.productId,
+          productImageUrl: segment.productImageUrl,
           position,
           plannedSec: segment.plannedSec,
         },
@@ -325,8 +327,10 @@ export class LiveSessionsService {
             blockId: item.blockId,
             position: itemPosition,
             type: item.type,
+            title: item.title,
             content: item.content,
             emotionCodes: item.emotionCodes,
+            emotionImageUrls: item.emotionImageUrls,
             plannedSec: item.plannedSec,
           };
         }),

@@ -11,30 +11,71 @@ interface BlockRow {
   type: BlockType;
   groupId: string | null;
   productId: string | null;
+  title: string | null;
   content: string;
   durationSec: number;
   weight: number;
   lastUsedAt: Date | null;
-  emotions: Array<{ emotion: { code: string } }>;
+  emotions: Array<{ emotion: { code: string; imageUrl: string | null } }>;
 }
 
 interface PlannedItem {
   blockId: string | null;
   type: BlockType;
+  title: string | null;
   content: string;
   emotionCodes: string[];
+  emotionImageUrls: string[];
   plannedSec: number;
+}
+
+function snapshotTitle(block: BlockRow): string | null {
+  const trimmed = block.title?.trim();
+  return trimmed || null;
 }
 
 export interface PlannedSegment {
   kind: SegmentKind;
   productId: string | null;
+  productImageUrl: string | null;
   plannedSec: number;
   items: PlannedItem[];
 }
 
 function emotionCodesOf(block: BlockRow): string[] {
   return block.emotions.map((row) => row.emotion.code);
+}
+
+function emotionImageUrlsOf(block: BlockRow): string[] {
+  return block.emotions
+    .map((row) => row.emotion.imageUrl?.trim())
+    .filter((url): url is string => Boolean(url));
+}
+
+/**
+ * Hàm này để tạo item từ block
+ * @param block block
+ * @param options options của item
+ * @returns item
+ */
+function plannedItemFromBlock(
+  block: BlockRow,
+  options: { content: string; plannedSec: number },
+): PlannedItem {
+  return {
+    blockId: block.id,
+    type: block.type,
+    title: snapshotTitle(block),
+    content: options.content,
+    emotionCodes: emotionCodesOf(block),
+    emotionImageUrls: emotionImageUrlsOf(block),
+    plannedSec: options.plannedSec,
+  };
+}
+
+function productImageUrlOf(product: { images: string[] }): string | null {
+  const url = product.images[0]?.trim();
+  return url || null;
 }
 
 /**
@@ -80,26 +121,24 @@ function packBlocks(
     // Thêm thời lượng của block vào số lượng thời lượng đã sử dụng
     used += picked.durationSec;
     // Thêm block vào items
-    items.push({
-      blockId: picked.id,
-      type: picked.type,
-      content: vars ? renderPlaceholders(picked.content, vars) : picked.content,
-      emotionCodes: emotionCodesOf(picked),
-      plannedSec: picked.durationSec,
-    });
+    items.push(
+      plannedItemFromBlock(picked, {
+        content: vars ? renderPlaceholders(picked.content, vars) : picked.content,
+        plannedSec: picked.durationSec,
+      }),
+    );
   }
 
   if (items.length === 0) {
     // Nếu không chọn được block thì chọn block ngẫu nhiên từ pool
     const fallback = pickBlock(pool);
     if (!fallback) return [];
-    items.push({
-      blockId: fallback.id,
-      type: fallback.type,
-      content: vars ? renderPlaceholders(fallback.content, vars) : fallback.content,
-      emotionCodes: emotionCodesOf(fallback),
-      plannedSec: Math.min(fallback.durationSec, budgetSec),
-    });
+    items.push(
+      plannedItemFromBlock(fallback, {
+        content: vars ? renderPlaceholders(fallback.content, vars) : fallback.content,
+        plannedSec: Math.min(fallback.durationSec, budgetSec),
+      }),
+    );
   }
 
   return items;
@@ -112,7 +151,13 @@ function packBlocks(
  * @returns items của product
  */
 function fillProduct(
-  product: { id: string; code: string; name: string; attributes: Prisma.JsonValue },
+  product: {
+    id: string;
+    code: string;
+    name: string;
+    attributes: Prisma.JsonValue;
+    images: string[];
+  },
   plannedSec: number,
   blocks: BlockRow[],
 ): PlannedItem[] {
@@ -134,13 +179,12 @@ function fillProduct(
     if (!picked) continue;
     if (used + picked.durationSec > plannedSec && items.length > 0) continue;
     used += picked.durationSec;
-    items.push({
-      blockId: picked.id,
-      type: picked.type,
-      content: renderPlaceholders(picked.content, vars),
-      emotionCodes: emotionCodesOf(picked),
-      plannedSec: picked.durationSec,
-    });
+    items.push(
+      plannedItemFromBlock(picked, {
+        content: renderPlaceholders(picked.content, vars),
+        plannedSec: picked.durationSec,
+      }),
+    );
   }
 
   const extraPool = blocks.filter(
@@ -200,7 +244,13 @@ function fillGame(gameBlocks: BlockRow[], plannedSec: number): PlannedItem[] {
 export function planTimeline(
   slots: GenerateSlot[],
   deps: {
-    products: Array<{ id: string; code: string; name: string; attributes: Prisma.JsonValue }>;
+    products: Array<{
+      id: string;
+      code: string;
+      name: string;
+      attributes: Prisma.JsonValue;
+      images: string[];
+    }>;
     openingBlocks: BlockRow[];
     closingBlocks: BlockRow[];
     ctaBlocks: BlockRow[];
@@ -219,6 +269,7 @@ export function planTimeline(
       segments.push({
         kind: SegmentKind.OPENING,
         productId: null,
+        productImageUrl: null,
         plannedSec: slot.plannedSec,
         items: packBlocks(deps.openingBlocks, slot.plannedSec),
       });
@@ -232,6 +283,7 @@ export function planTimeline(
       segments.push({
         kind: SegmentKind.CLOSING,
         productId: null,
+        productImageUrl: null,
         plannedSec: slot.plannedSec,
         items: packBlocks(deps.closingBlocks, slot.plannedSec),
       });
@@ -249,6 +301,7 @@ export function planTimeline(
       segments.push({
         kind: SegmentKind.PRODUCT,
         productId: product.id,
+        productImageUrl: productImageUrlOf(product),
         plannedSec: slot.plannedSec,
         items: fillProduct(product, slot.plannedSec, deps.productBlocks),
       });
@@ -259,6 +312,7 @@ export function planTimeline(
       segments.push({
         kind: SegmentKind.CTA,
         productId: null,
+        productImageUrl: null,
         plannedSec: slot.plannedSec,
         items: fillCta(deps.ctaBlocks, slot.groupId, slot.plannedSec),
       });
@@ -269,6 +323,7 @@ export function planTimeline(
       segments.push({
         kind: SegmentKind.GAME,
         productId: null,
+        productImageUrl: null,
         plannedSec: slot.plannedSec,
         items: fillGame(deps.gameBlocks, slot.plannedSec),
       });

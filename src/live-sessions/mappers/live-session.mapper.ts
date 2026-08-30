@@ -14,8 +14,10 @@ export interface SegmentItemResponse {
   readonly blockId: string | null;
   readonly position: number;
   readonly type: BlockType;
+  readonly title: string | null;
   readonly content: string;
   readonly emotionCodes: string[];
+  readonly emotionImageUrls: string[];
   readonly plannedSec: number;
   readonly status: ItemStatus;
 }
@@ -26,6 +28,7 @@ export interface SessionSegmentResponse {
   readonly productId: string | null;
   readonly productCode: string | null;
   readonly productName: string | null;
+  readonly productImageUrl: string | null;
   readonly position: number;
   readonly plannedSec: number;
   readonly items: SegmentItemResponse[];
@@ -90,8 +93,10 @@ function mapItem(item: SegmentItem): SegmentItemResponse {
     blockId: item.blockId,
     position: item.position,
     type: item.type,
+    title: item.title,
     content: item.content,
     emotionCodes: item.emotionCodes,
+    emotionImageUrls: item.emotionImageUrls,
     plannedSec: item.plannedSec,
     status: item.status,
   };
@@ -142,6 +147,7 @@ export function mapLiveSessionToDetailResponse(
       productId: segment.productId,
       productCode: segment.product?.code ?? null,
       productName: segment.product?.name ?? null,
+      productImageUrl: segment.productImageUrl,
       position: segment.position,
       plannedSec: segment.plannedSec,
       items: segment.items.map(mapItem),
