@@ -78,10 +78,12 @@ enum ItemStatus {
 // Vai trò của một đoạn trong timeline. Không suy ra từ position được vì
 // người tạo phiên sửa tay thứ tự trước khi live.
 enum SegmentKind {
-  OPENING     // đúng 1 đoạn, đầu phiên
-  PRODUCT     // giới thiệu 1 sản phẩm, có ngân sách thời gian riêng
-  INTERLUDE   // đoạn xen giữa 2 sản phẩm: CTA + trò chơi
-  CLOSING     // đúng 1 đoạn, cuối phiên
+  OPENING     // mở đầu — vị trí do người soạn xếp
+  PRODUCT     // giới thiệu 1 sản phẩm
+  CTA         // kêu gọi hành động, không bắt buộc sau sản phẩm
+  GAME        // trò chơi — chỉ biểu cảm, không lấy kho nội dung
+  INTERLUDE   // bản cũ: CTA + game gộp một đoạn; generate mới không tạo
+  CLOSING
   @@map("segment_kind")
 }
 
@@ -301,9 +303,8 @@ model LiveSession {
   @@map("live_sessions")
 }
 
-// Một đoạn trong timeline. Chuỗi đoạn của một phiên:
-// OPENING -> [PRODUCT -> INTERLUDE] x N -> CLOSING.
-// Phiên 4.5h với 300s mỗi sản phẩm và ~120s mỗi đoạn xen ≈ 38 sản phẩm.
+// Một đoạn trong timeline. Thứ tự = position do người soạn xếp
+// (OPENING / PRODUCT / CTA / GAME / CLOSING, không bắt buộc xen kẽ).
 model SessionSegment {
   id         String      @id @default(uuid()) @db.Uuid
   sessionId  String      @map("session_id") @db.Uuid
@@ -328,7 +329,7 @@ model SessionSegment {
 model SegmentItem {
   id        String    @id @default(uuid()) @db.Uuid
   segmentId String    @map("segment_id") @db.Uuid
-  blockId   String    @map("block_id")   @db.Uuid
+  blockId   String?    @map("block_id")   @db.Uuid
   position  Int
   type      BlockType                               // chép từ block để render timeline khỏi join
 
@@ -354,7 +355,7 @@ model SegmentItem {
 
   segment SessionSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
   // Không Cascade: block đã lên sóng thì không cho xoá mất dấu, dùng isActive để tắt.
-  block   ScriptBlock    @relation(fields: [blockId], references: [id])
+  block   ScriptBlock?    @relation(fields: [blockId], references: [id])
 
   @@unique([segmentId, position])
   @@index([segmentId, status])      // truy vấn nóng khi live: tìm item đang ACTIVE
