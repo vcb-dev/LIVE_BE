@@ -5,10 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { BlockType, Prisma } from '@prisma/client';
+import type { AiScriptBlockSuggestion } from '../ai/ai.service';
+import { AiService } from '../ai/ai.service';
 import type { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { buildPaginatedMeta } from '../common/pagination/paginate';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateScriptBlockDto } from './dto/create-script-block.dto';
+import type { GenerateMeaningSuggestionDto } from './dto/generate-meaning-suggestion.dto';
 import { ListScriptBlocksQueryDto } from './dto/list-script-blocks-query.dto';
 import { UpdateScriptBlockDto } from './dto/update-script-block.dto';
 import {
@@ -20,7 +23,10 @@ import { validateScriptBlockScope } from './script-blocks.rules';
 
 @Injectable()
 export class ScriptBlocksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aiService: AiService,
+  ) {}
 
   async findAll(
     query: ListScriptBlocksQueryDto,
@@ -131,6 +137,41 @@ export class ScriptBlocksService {
       this.rethrowPrismaError(error, 'update');
       throw error;
     }
+  }
+
+  async generateMeaningSuggestion(
+    dto: GenerateMeaningSuggestionDto,
+  ): Promise<AiScriptBlockSuggestion> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        attributes: true,
+        isActive: true,
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Không tìm thấy sản phẩm');
+    }
+
+    if (!product.isActive) {
+      throw new BadRequestException('Sản phẩm đang bị tắt');
+    }
+
+    const attributes = this.toProductAttributes(product.attributes);
+
+    return this.aiService.generateScriptBlock(
+      BlockType.MEANING,
+      {
+        code: product.code,
+        name: product.name,
+        attributes,
+      },
+      dto.existingTitle,
+    );
   }
 
   async remove(id: string): Promise<void> {
@@ -257,6 +298,13 @@ export class ScriptBlocksService {
     if (!exists) {
       throw new NotFoundException('Không tìm thấy block kịch bản');
     }
+  }
+
+  private toProductAttributes(value: Prisma.JsonValue | null): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+    return value as Record<string, unknown>;
   }
 
   private rethrowPrismaError(error: unknown, action: 'create' | 'update' | 'remove'): void {

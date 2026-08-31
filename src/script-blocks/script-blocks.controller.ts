@@ -13,7 +13,9 @@ import {
 } from '@nestjs/common';
 import { Roles, STAFF_ROLES } from '../auth/decorators';
 import type { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
+import type { AiScriptBlockSuggestion } from '../ai/ai.service';
 import { CreateScriptBlockDto } from './dto/create-script-block.dto';
+import { GenerateMeaningSuggestionDto } from './dto/generate-meaning-suggestion.dto';
 import { ListScriptBlocksQueryDto } from './dto/list-script-blocks-query.dto';
 import { UpdateScriptBlockDto } from './dto/update-script-block.dto';
 import type { ScriptBlockResponse } from './mappers/script-block.mapper';
@@ -35,6 +37,13 @@ export class ScriptBlocksController {
   @Post()
   create(@Body() dto: CreateScriptBlockDto): Promise<ScriptBlockResponse> {
     return this.scriptBlocksService.create(dto);
+  }
+
+  @Post('generate-meaning-suggestion')
+  generateMeaningSuggestion(
+    @Body() dto: GenerateMeaningSuggestionDto,
+  ): Promise<AiScriptBlockSuggestion> {
+    return this.scriptBlocksService.generateMeaningSuggestion(dto);
   }
 
   @Get(':id')

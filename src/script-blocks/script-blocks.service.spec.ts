@@ -3,6 +3,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { BlockType } from '@prisma/client';
+import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScriptBlocksService } from './script-blocks.service';
 
@@ -73,11 +74,19 @@ describe('ScriptBlocksService', () => {
     $transaction: jest.fn(),
   };
 
+  const aiService = {
+    generateScriptBlock: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
     const moduleRef = await Test.createTestingModule({
-      providers: [ScriptBlocksService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        ScriptBlocksService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: AiService, useValue: aiService },
+      ],
     }).compile();
 
     service = moduleRef.get(ScriptBlocksService);
@@ -182,6 +191,44 @@ describe('ScriptBlocksService', () => {
 
       expect(result.id).toBe(sampleBlock.id);
       expect(result.productCode).toBe('SP001');
+    });
+  });
+
+  describe('generateMeaningSuggestion', () => {
+    it('loads product and calls AI service', async () => {
+      prisma.product.findUnique.mockResolvedValue({
+        id: productId,
+        code: 'SP001',
+        name: 'Nhẫn vàng',
+        attributes: { material: 'Vàng 18K' },
+        isActive: true,
+      });
+      aiService.generateScriptBlock.mockResolvedValue({
+        title: 'Ý nghĩa nhẫn',
+        content: 'Món trang sức này...',
+        suggestedDurationSec: 60,
+      });
+
+      const result = await service.generateMeaningSuggestion({ productId });
+
+      expect(aiService.generateScriptBlock).toHaveBeenCalledWith(
+        BlockType.MEANING,
+        {
+          code: 'SP001',
+          name: 'Nhẫn vàng',
+          attributes: { material: 'Vàng 18K' },
+        },
+        undefined,
+      );
+      expect(result.title).toBe('Ý nghĩa nhẫn');
+    });
+
+    it('throws when product is missing', async () => {
+      prisma.product.findUnique.mockResolvedValue(null);
+
+      await expect(service.generateMeaningSuggestion({ productId })).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
   });
 
