@@ -11,9 +11,9 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import type { AiScriptBlockSuggestion } from '../ai-integration/ai.service';
 import { Roles, STAFF_ROLES } from '../auth/decorators';
 import type { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
-import type { AiScriptBlockSuggestion } from '../ai/ai.service';
 import { CreateScriptBlockDto } from './dto/create-script-block.dto';
 import { GenerateMeaningSuggestionDto } from './dto/generate-meaning-suggestion.dto';
 import { ListScriptBlocksQueryDto } from './dto/list-script-blocks-query.dto';

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AiModule } from '../ai/ai.module';
+import { AiModule } from '../ai-integration/ai.module';
 import { ScriptBlocksController } from './script-blocks.controller';
 import { ScriptBlocksService } from './script-blocks.service';
 

@@ -3,7 +3,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { BlockType } from '@prisma/client';
-import { AiService } from '../ai/ai.service';
+import { AiService } from '../ai-integration/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScriptBlocksService } from './script-blocks.service';
 

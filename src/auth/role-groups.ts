@@ -19,6 +19,6 @@ export const STAFF_ROLES = [UserRole.LEADER, UserRole.ADMIN] as const;
 
 export const MEMBER_ROLES = [UserRole.MEMBER] as const;
 
-// export const ADMIN_ONLY_ROLES = [UserRole.ADMIN] as const; // bỏ comment khi cần
+export const ADMIN_ONLY_ROLES = [UserRole.ADMIN] as const;
 
 export type StaffRole = (typeof STAFF_ROLES)[number];

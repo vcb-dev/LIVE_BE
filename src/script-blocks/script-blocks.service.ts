@@ -5,8 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { BlockType, Prisma } from '@prisma/client';
-import type { AiScriptBlockSuggestion } from '../ai/ai.service';
-import { AiService } from '../ai/ai.service';
+import type { AiScriptBlockSuggestion } from '../ai-integration/ai.service';
+import { AiService } from '../ai-integration/ai.service';
 import type { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { buildPaginatedMeta } from '../common/pagination/paginate';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,9 +28,7 @@ export class ScriptBlocksService {
     private readonly aiService: AiService,
   ) {}
 
-  async findAll(
-    query: ListScriptBlocksQueryDto,
-  ): Promise<PaginatedResponse<ScriptBlockResponse>> {
+  async findAll(query: ListScriptBlocksQueryDto): Promise<PaginatedResponse<ScriptBlockResponse>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
