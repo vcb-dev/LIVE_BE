@@ -18,6 +18,7 @@ import { LiveSessionsModule } from './live-sessions/live-sessions.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
 import { ScriptBlocksModule } from './script-blocks/script-blocks.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { ScriptBlocksModule } from './script-blocks/script-blocks.module';
     ProductsModule,
     ScriptBlocksModule,
     LiveSessionsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [

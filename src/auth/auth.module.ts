@@ -23,6 +23,6 @@ import { RefreshTokenRepository } from './refresh-token.repository';
   ],
   controllers: [AuthController],
   providers: [AuthService, CookieAuthService, RefreshTokenRepository],
-  exports: [JwtModule, CookieAuthService],
+  exports: [JwtModule, CookieAuthService, RefreshTokenRepository],
 })
 export class AuthModule {}
