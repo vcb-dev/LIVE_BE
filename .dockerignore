@@ -1,27 +1,44 @@
+# deps / artifacts — không đưa vào context
 node_modules
 dist
-uploads
-*.csv
-*.sql
-*.log
-.git
+.pnpm-store
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# secrets / local data
 .env
-scratch
-scratch*
+.env.*
+uploads
+
+# VCS / CI / docs / editor
+.git
+.github
+*.md
+.vscode
+.idea
+.DS_Store
+.prettierignore
+.prettierrc
+
+# không cần để build image
 test
 scripts
 imports
 docs
 coverage
-*.md
+scratch
+scratch*
+scratch_*.ts
 **/*.spec.ts
 **/*spec.ts
-scratch_*.ts
+*.csv
+*.sql
+*.log
+*.xlsx
+read_xlsx.js
+eslint.config.mjs
+jest.config.ts
+docker-compose.yml
+
+# migrate chạy ở CI, image runtime không cần
 prisma/migrations
-*.json
-!package.json
-!package-lock.json
-!tsconfig.json
-!tsconfig.build.json
-!nest-cli.json
-!prisma/schema.prisma

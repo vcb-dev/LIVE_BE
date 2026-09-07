@@ -17,7 +17,7 @@ graph LR
   - Riêng FE: bước lint đang **non-blocking** (còn 12 lỗi lint sẵn có từ rule mới của `react-hooks` v7 và các file shadcn/ui). Fix xong thì xóa `continue-on-error: true` trong workflow để lint chặn merge.
 - **`deploy.yml`** (BE): chạy khi push vào `main` (hoặc bấm tay qua _Run workflow_), 3 job tuần tự:
   1. **Migrate** — chạy `scripts/ensure-migration-baseline.js` rồi `npx prisma migrate deploy` lên Supabase. Migration chạy **trước** khi deploy code mới.
-  2. **Build & Push** — build Docker image, push lên Docker Hub (`<user>/tyv-crm-be:latest`).
+  2. **Build & Push** — build Docker image, push lên Docker Hub (`<user>/live-be:latest`).
   3. **Redeploy** — gọi Railway CLI redeploy service để kéo image mới.
 - **FE**: Vercel tự deploy khi push (git integration) — workflow FE chỉ làm CI gác cổng.
 
@@ -47,7 +47,7 @@ Vào **Settings → Secrets and variables → Actions → Secrets**:
 
 ## Setup Railway (làm 1 lần)
 
-1. Tạo service mới: **New → Docker Image** → nhập `docker.io/<dockerhub-user>/tyv-crm-be:latest`.
+1. Tạo service mới: **New → Docker Image** → nhập `docker.io/<dockerhub-user>/live-be:latest`.
 2. Vào tab **Variables** của service, set env production:
    - `DATABASE_URL` (pooler 6543), `DIRECT_URL` (direct 5432)
    - `PORT=8080` (Dockerfile expose 8080 — hoặc để Railway tự inject `PORT`, app đã đọc `process.env.PORT`)
@@ -60,7 +60,7 @@ Sau đó trên Vercel set:
 
 - `VITE_API_URL=/api` (same-site proxy — Safari nhận cookie `SameSite=Lax`)
 - **Không** set `https://…railway.app/api` (BE không có prefix `/api` → lỗi `Cannot POST /api/auth/login`)
-- `vercel.json` đã rewrite `/api/:path*` → `https://tyv-crm-be-production.up.railway.app/:path*`
+- `vercel.json` đã rewrite `/api/:path*` → `https://live-be-production.up.railway.app/:path*`
 
 ## Deploy thủ công / xử lý sự cố
 
