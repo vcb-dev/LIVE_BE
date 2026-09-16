@@ -10,7 +10,6 @@ import { ScriptBlocksService } from './script-blocks.service';
 const now = new Date('2026-08-27T00:00:00.000Z');
 
 const productId = '11111111-1111-4111-8111-111111111111';
-const groupId = '22222222-2222-4222-8222-222222222222';
 const emotionId = '33333333-3333-4333-8333-333333333333';
 
 const sampleBlock = {
