@@ -27,27 +27,21 @@ ALTER TABLE "session_segments" ALTER COLUMN "kind" DROP DEFAULT;
 -- tìm được không dấu, nhưng không hiểu biến thể từ.
 -- Supabase để extension ở schema "extensions"; shadow database của Prisma thì trắng
 -- nên phải tự tạo. Trên DB thật câu lệnh này là no-op.
-CREATE SCHEMA IF NOT EXISTS extensions;
-CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA extensions;
-
--- unaccent() là STABLE (phụ thuộc từ điển) nên Postgres không cho dùng trực tiếp
--- trong cột generated. Bọc lại thành IMMUTABLE bằng dạng 2 tham số chỉ đích danh
--- từ điển, cách xử lý tiêu chuẩn cho trường hợp này.
--- ponytail: nếu sau này sửa từ điển unaccent thì phải REINDEX script_blocks_search_idx.
-CREATE OR REPLACE FUNCTION public.immutable_unaccent(text)
+-- ponytail: Supabase shared DB thường có unaccent ở public, không phải extensions.*
+CREATE OR REPLACE FUNCTION immutable_unaccent(text)
   RETURNS text
   LANGUAGE sql
   IMMUTABLE
   PARALLEL SAFE
   STRICT
-AS $$ SELECT extensions.unaccent('extensions.unaccent'::regdictionary, $1) $$;
+AS $$ SELECT public.unaccent($1) $$;
 
 ALTER TABLE "script_blocks" DROP COLUMN "search_vector";
 
 ALTER TABLE "script_blocks"
   ADD COLUMN "search_vector" tsvector
   GENERATED ALWAYS AS (
-    to_tsvector('simple', public.immutable_unaccent(coalesce("title", '') || ' ' || "content"))
+    to_tsvector('simple', immutable_unaccent(coalesce("title", '') || ' ' || "content"))
   ) STORED;
 
 CREATE INDEX "script_blocks_search_idx" ON "script_blocks" USING GIN ("search_vector");
