@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/tyv-crm-be:latest
+  IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/live-be:latest
 
 jobs:
   migrate:

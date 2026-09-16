@@ -57,8 +57,8 @@ async function bootstrap() {
   const allowedOrigins = corsOrigins?.length
     ? corsOrigins
     : ['http://localhost:5173', 'http://127.0.0.1:5173'];
-  // Cho phép mọi domain Vercel cua du an (production, git-branch, preview theo hash)
-  const vercelOriginPattern = /^https:\/\/tyv-crm[a-z0-9-]*\.vercel\.app$/i;
+  // Preview / branch trên Vercel: live-fe-five, live-fe-git-..., v.v.
+  const vercelOriginPattern = /^https:\/\/live-fe[a-z0-9-]*\.vercel\.app$/i;
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -67,7 +67,7 @@ async function bootstrap() {
       if (allowedOrigins.includes(origin) || vercelOriginPattern.test(origin)) {
         return callback(null, true);
       }
-      return callback(new Error(`Origin khong duoc phep boi CORS: ${origin}`), false);
+      return callback(null, false);
     },
     credentials: true,
     allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Authorization'],
