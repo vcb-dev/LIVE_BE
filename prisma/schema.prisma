@@ -6,6 +6,7 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  schemas   = ["LIVE"]
 }
 
 // ============ AUTH (giữ nguyên, chỉ thêm quan hệ liveSessions) ============
@@ -21,6 +22,7 @@ model User {
 
   refreshTokens RefreshToken[]
   liveSessions  LiveSession[]
+  @@schema("LIVE")
   @@map("users")
 }
 
@@ -34,6 +36,7 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId])
+  @@schema("LIVE")
   @@map("refresh_tokens")
 }
 
@@ -41,6 +44,7 @@ enum UserRole {
   MEMBER
   LEADER
   ADMIN
+  @@schema("LIVE")
   @@map("user_role")
 }
 
@@ -56,6 +60,7 @@ enum BlockType {
   CTA           // hành động: kêu gọi, chốt đơn, social proof... có chia mục con
   GAME          // trò chơi: đoán giá, comment may mắn... có chia mục con
   CLOSING       // kết thúc
+  @@schema("LIVE")
   @@map("block_type")
 }
 
@@ -64,6 +69,7 @@ enum SessionStatus {
   RUNNING
   PAUSED
   FINISHED
+  @@schema("LIVE")
   @@map("session_status")
 }
 
@@ -72,6 +78,7 @@ enum ItemStatus {
   ACTIVE     // đang chạy, đồng hồ đếm
   DONE
   SKIPPED    // bỏ qua khi phiên bị trễ giờ
+  @@schema("LIVE")
   @@map("item_status")
 }
 
@@ -84,6 +91,7 @@ enum SegmentKind {
   GAME        // trò chơi — chỉ biểu cảm, không lấy kho nội dung
   INTERLUDE   // bản cũ: CTA + game gộp một đoạn; generate mới không tạo
   CLOSING
+  @@schema("LIVE")
   @@map("segment_kind")
 }
 
@@ -106,6 +114,7 @@ model Emotion {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   blocks BlockEmotion[]
+  @@schema("LIVE")
   @@map("emotions")
 }
 
@@ -119,6 +128,7 @@ model BlockEmotion {
 
   @@id([blockId, emotionId])
   @@index([emotionId])
+  @@schema("LIVE")
   @@map("block_emotions")
 }
 
@@ -147,6 +157,7 @@ model BlockGroup {
 
   blocks ScriptBlock[]
   @@unique([type, code])    // code chỉ cần duy nhất trong phạm vi một loại
+  @@schema("LIVE")
   @@map("block_groups")
 }
 
@@ -163,6 +174,7 @@ model Category {
   children Category[]    @relation("CategoryTree")
   products Product[]
   blocks   ScriptBlock[]
+  @@schema("LIVE")
   @@map("categories")
 }
 
@@ -207,6 +219,7 @@ model Product {
   segments SessionSegment[]
 
   @@index([categoryId, isActive])
+  @@schema("LIVE")
   @@map("products")
 }
 
@@ -224,6 +237,7 @@ model ProductVariant {
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   @@index([productId])
+  @@schema("LIVE")
   @@map("product_variants")
 }
 
@@ -277,6 +291,7 @@ model ScriptBlock {
   @@index([categoryId, type, isActive])           // tầng dự phòng khi SP chưa có nội dung riêng
   @@index([type, groupId, isActive, lastUsedAt])  // block dùng chung, ưu tiên lâu chưa dùng
   @@index([searchVector], type: Gin)              // tìm toàn văn trong ~250k dòng
+  @@schema("LIVE")
   @@map("script_blocks")
 }
 
@@ -300,6 +315,7 @@ model LiveSession {
   segments SessionSegment[]
 
   @@index([status, scheduledAt])
+  @@schema("LIVE")
   @@map("live_sessions")
 }
 
@@ -324,6 +340,7 @@ model SessionSegment {
   items   SegmentItem[]
 
   @@unique([sessionId, position])   // chặn 2 segment cùng vị trí trong 1 phiên
+  @@schema("LIVE")
   @@map("session_segments")
 }
 
@@ -366,5 +383,6 @@ model SegmentItem {
 
   @@unique([segmentId, position])
   @@index([segmentId, status])      // truy vấn nóng khi live: tìm item đang ACTIVE
+  @@schema("LIVE")
   @@map("segment_items")
 }
