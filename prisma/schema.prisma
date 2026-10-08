@@ -386,3 +386,25 @@ model SegmentItem {
   @@schema("LIVE")
   @@map("segment_items")
 }
+
+enum LiveLookupKind {
+  SHIFT
+  LIVE_TYPE
+  TEAM
+  CHANNEL
+  @@schema("LIVE")
+  @@map("live_lookup_kind")
+}
+
+model LiveLookup {
+  id        String         @id @default(uuid()) @db.Uuid
+  kind      LiveLookupKind
+  name      String
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  @@unique([kind, name])
+  @@index([kind])
+  @@schema("LIVE")
+  @@map("live_lookups")
+}
