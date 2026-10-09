@@ -14,10 +14,12 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { BlockGroupsModule } from './block-groups/block-groups.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { EmotionsModule } from './emotions/emotions.module';
+import { LiveLookupsModule } from './live-lookups/live-lookups.module';
 import { LiveSessionsModule } from './live-sessions/live-sessions.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
 import { ScriptBlocksModule } from './script-blocks/script-blocks.module';
+import { SessionReportsModule } from './session-reports/session-reports.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -50,6 +52,8 @@ import { UsersModule } from './users/users.module';
     ScriptBlocksModule,
     LiveSessionsModule,
     UsersModule,
+    LiveLookupsModule,
+    SessionReportsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -20,8 +20,9 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  refreshTokens RefreshToken[]
-  liveSessions  LiveSession[]
+  refreshTokens  RefreshToken[]
+  liveSessions   LiveSession[]
+  sessionReports SessionReport[]
   @@schema("LIVE")
   @@map("users")
 }
@@ -313,6 +314,7 @@ model LiveSession {
 
   host     User?            @relation(fields: [hostId], references: [id])
   segments SessionSegment[]
+  reports  SessionReport[]
 
   @@index([status, scheduledAt])
   @@schema("LIVE")
@@ -385,4 +387,65 @@ model SegmentItem {
   @@index([segmentId, status])      // truy vấn nóng khi live: tìm item đang ACTIVE
   @@schema("LIVE")
   @@map("segment_items")
+}
+
+enum LiveLookupKind {
+  SHIFT
+  LIVE_TYPE
+  TEAM
+  CHANNEL
+  @@schema("LIVE")
+  @@map("live_lookup_kind")
+}
+
+model LiveLookup {
+  id        String         @id @default(uuid()) @db.Uuid
+  kind      LiveLookupKind
+  name      String
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  shiftReports    SessionReport[] @relation("ReportShift")
+  liveTypeReports SessionReport[] @relation("ReportLiveType")
+  teamReports     SessionReport[] @relation("ReportTeam")
+  channelReports  SessionReport[] @relation("ReportChannel")
+
+  @@unique([kind, name])
+  @@index([kind])
+  @@schema("LIVE")
+  @@map("live_lookups")
+}
+
+// Báo cáo nhân sự nộp sau khi kết thúc ca. Ca / loại / team / kênh trỏ vào danh mục.
+model SessionReport {
+  id              String   @id @default(uuid()) @db.Uuid
+  sessionId       String   @map("session_id") @db.Uuid
+  submittedById   String   @map("submitted_by_id") @db.Uuid
+  liveDate        DateTime @map("live_date") @db.Date
+  staffName       String   @map("staff_name")
+  shiftId         String   @map("shift_id") @db.Uuid
+  liveTypeId      String   @map("live_type_id") @db.Uuid
+  teamId          String   @map("team_id") @db.Uuid
+  channelId       String   @map("channel_id") @db.Uuid
+  totalHours      Decimal  @map("total_hours") @db.Decimal(6, 2)
+  revenue         Decimal  @db.Decimal(14, 2)
+  viewCount       Int      @map("view_count")
+  retentionRate   Decimal  @map("retention_rate") @db.Decimal(5, 2)
+  orderCount      Int      @map("order_count")
+  impressionCount Int      @map("impression_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  session     LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  submittedBy User        @relation(fields: [submittedById], references: [id])
+  shift       LiveLookup  @relation("ReportShift", fields: [shiftId], references: [id], onDelete: Restrict)
+  liveType    LiveLookup  @relation("ReportLiveType", fields: [liveTypeId], references: [id], onDelete: Restrict)
+  team        LiveLookup  @relation("ReportTeam", fields: [teamId], references: [id], onDelete: Restrict)
+  channel     LiveLookup  @relation("ReportChannel", fields: [channelId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId])
+  @@index([liveDate])
+  @@schema("LIVE")
+  @@map("session_reports")
 }
