@@ -43,7 +43,12 @@ describe('SessionReportsService', () => {
   const prisma = {
     liveSession: { findUnique: jest.fn() },
     liveLookup: { findMany: jest.fn() },
-    sessionReport: { create: jest.fn(), findMany: jest.fn(), count: jest.fn() },
+    sessionReport: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      count: jest.fn(),
+      groupBy: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
 
@@ -125,6 +130,57 @@ describe('SessionReportsService', () => {
         },
       }),
     );
+  });
+
+  it('ranks the day by revenue, views, and average retention', async () => {
+    prisma.sessionReport.groupBy.mockResolvedValue([
+      {
+        staffName: 'Mai',
+        _sum: { revenue: decimal(20000000), viewCount: 500 },
+        _avg: { retentionRate: decimal(70) },
+      },
+      {
+        staffName: 'Lan',
+        _sum: { revenue: decimal(20000000), viewCount: 100 },
+        _avg: { retentionRate: decimal(40) },
+      },
+      {
+        staffName: 'Hoa',
+        _sum: { revenue: decimal(5000000), viewCount: 200 },
+        _avg: { retentionRate: decimal(70) },
+      },
+    ]);
+
+    const actual = await service.dailyRankings('2026-10-01', '2026-10-09');
+
+    expect(prisma.sessionReport.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['staffName'],
+        where: {
+          liveDate: {
+            gte: new Date('2026-10-01T00:00:00.000Z'),
+            lte: new Date('2026-10-09T00:00:00.000Z'),
+          },
+        },
+      }),
+    );
+    expect(actual.revenue.map((row) => row.staffName)).toEqual(['Lan', 'Mai', 'Hoa']);
+    expect(actual.traffic.map((row) => row.staffName)).toEqual(['Mai', 'Hoa', 'Lan']);
+    expect(actual.retention.map((row) => row.staffName)).toEqual(['Hoa', 'Mai', 'Lan']);
+    expect(actual.revenue[0]).toEqual({ rank: 1, staffName: 'Lan', value: 20000000 });
+    expect(actual.traffic[0]?.value).toBe(500);
+    expect(actual.retention[0]?.value).toBe(70);
+  });
+
+  it('returns empty rankings when nobody submitted that day', async () => {
+    prisma.sessionReport.groupBy.mockResolvedValue([]);
+
+    const actual = await service.dailyRankings();
+
+    expect(prisma.sessionReport.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: {} }),
+    );
+    expect(actual).toEqual({ revenue: [], traffic: [], retention: [] });
   });
 
   it('throws when the session does not exist', async () => {

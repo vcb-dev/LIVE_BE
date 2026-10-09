@@ -3,6 +3,7 @@ import { LiveLookupKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 import { buildPaginatedMeta } from '../common/pagination/paginate';
+import { buildDailyRankings, type DailyRankingsResponse } from './daily-rankings';
 import { CreateSessionReportDto } from './dto/create-session-report.dto';
 import { ListSessionReportsQueryDto } from './dto/list-session-reports-query.dto';
 import {
@@ -18,6 +19,16 @@ const reportInclude = {
   session: { select: { id: true, name: true } },
 } satisfies Prisma.SessionReportInclude;
 
+function liveDateRange(from?: string, to?: string): Prisma.SessionReportWhereInput {
+  if (!from && !to) return {};
+  return {
+    liveDate: {
+      ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
+      ...(to ? { lte: new Date(`${to}T00:00:00.000Z`) } : {}),
+    },
+  };
+}
+
 @Injectable()
 export class SessionReportsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -27,14 +38,7 @@ export class SessionReportsService {
     const limit = query.limit ?? 20;
     const where: Prisma.SessionReportWhereInput = {
       ...(query.q ? { staffName: { contains: query.q, mode: 'insensitive' } } : {}),
-      ...(query.from || query.to
-        ? {
-            liveDate: {
-              ...(query.from ? { gte: new Date(`${query.from}T00:00:00.000Z`) } : {}),
-              ...(query.to ? { lte: new Date(`${query.to}T00:00:00.000Z`) } : {}),
-            },
-          }
-        : {}),
+      ...liveDateRange(query.from, query.to),
     };
 
     const [rows, total] = await this.prisma.$transaction([
@@ -52,6 +56,17 @@ export class SessionReportsService {
       data: rows.map(mapSessionReportToResponse),
       meta: buildPaginatedMeta(page, limit, total),
     };
+  }
+
+  async dailyRankings(from?: string, to?: string): Promise<DailyRankingsResponse> {
+    const groups = await this.prisma.sessionReport.groupBy({
+      by: ['staffName'],
+      where: liveDateRange(from, to),
+      _sum: { revenue: true, viewCount: true },
+      _avg: { retentionRate: true },
+    });
+
+    return buildDailyRankings(groups);
   }
 
   async create(dto: CreateSessionReportDto, submittedById: string): Promise<SessionReportResponse> {
