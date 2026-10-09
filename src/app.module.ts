@@ -19,6 +19,7 @@ import { LiveSessionsModule } from './live-sessions/live-sessions.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
 import { ScriptBlocksModule } from './script-blocks/script-blocks.module';
+import { SessionReportsModule } from './session-reports/session-reports.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -52,6 +53,7 @@ import { UsersModule } from './users/users.module';
     LiveSessionsModule,
     UsersModule,
     LiveLookupsModule,
+    SessionReportsModule,
   ],
   controllers: [AppController],
   providers: [

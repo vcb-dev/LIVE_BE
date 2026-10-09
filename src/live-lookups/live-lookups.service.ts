@@ -59,7 +59,14 @@ export class LiveLookupsService {
 
   async remove(id: string): Promise<void> {
     await this.ensureExists(id);
-    await this.prisma.liveLookup.delete({ where: { id } });
+    try {
+      await this.prisma.liveLookup.delete({ where: { id } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new ConflictException('Không thể xóa mục đang được dùng trong báo cáo ca');
+      }
+      throw error;
+    }
   }
 
   private async ensureExists(id: string): Promise<void> {
